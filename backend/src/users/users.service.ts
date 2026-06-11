@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -16,13 +18,13 @@ export class UsersService {
   }
 
   async create(email: string, passwordHash: string, name: string) {
-
-    return this.prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        name
+    try {
+      return await this.prisma.user.create({ data: { email, passwordHash, name } });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException('Email already in use');
       }
-    });
+      throw e;
+    }
   }
 }

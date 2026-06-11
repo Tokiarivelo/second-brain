@@ -1,6 +1,9 @@
 import { 
   Controller, 
   Post, 
+  Get,
+  Param,
+  Delete,
   UploadedFile, 
   UseInterceptors, 
   ParseFilePipe, 
@@ -10,11 +13,47 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+
+import { DocumentsService } from './documents.service';
 
 @Controller('documents')
 export class DocumentsController {
 
+  constructor(
+    private readonly documentsService: DocumentsService
+  ) {}
+
+  // Chercher tout les document
+  @Get()
+  findAll() {
+    return this.documentsService.findAll();
+  }
+
+  // Récupérer un document selon son ID
+  @Get(':id')
+  findOne(
+    @Param('id') id: string
+  ) {
+    return this.documentsService.findOne(
+      Number(id)
+    );
+  }
+
+  // Supprimer un document
+  @Delete(':id')
+  remove(
+    @Param('id') id: string
+  ) {
+    return this.documentsService.remove(
+      Number(id)
+    );
+  }
+
+  // Uploader le document
   @Post('upload')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       // Configuration optionnelle pour sauvegarder directement sur le disque
@@ -43,11 +82,6 @@ export class DocumentsController {
     file: Express.Multer.File,
   ) {
     // Si la validation réussit, le fichier est enregistré
-    return {
-      message: 'Fichier PDF uploadé avec succès !',
-      filename: file.filename,
-      path: file.path,
-      size: file.size,
-    };
-  }
+    return this.documentsService.create(file);
+    }
 }

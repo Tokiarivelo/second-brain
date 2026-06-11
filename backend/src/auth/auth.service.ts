@@ -85,40 +85,41 @@ export class AuthService {
         
     }
 
+    // ✅ CORRECT — token rotation
     async refresh(refreshToken: string) {
+    const storedToken = await this.refreshTokenService.find(refreshToken);
 
-        const storedToken =
-            await this.refreshTokenService.find(
-            refreshToken
-            );
+    if (!storedToken || storedToken.expiresAt < new Date()) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+    }
 
-        if (!storedToken) {
-            throw new UnauthorizedException();
-        }
+    // Invalidate the used token immediately
+    await this.refreshTokenService.delete(refreshToken);
 
-        if (
-            storedToken.expiresAt < new Date()
-        ) {
-            throw new UnauthorizedException();
-        }
+    // ✅ CORRECT
+    let payload: { sub: number };
+    try {
+        payload = this.jwtService.verify(refreshToken);
+    } catch {
+        throw new UnauthorizedException('Invalid refresh token');
+    }
 
-        const payload =
-            this.jwtService.verify(
-            refreshToken
-            );
+    const newAccessToken = this.jwtService.sign(
+        { sub: payload.sub },
+        { expiresIn: '15m' },
+    );
 
-        const accessToken =
-            this.jwtService.sign(
-            {
-                sub: payload.sub,
-            },
-            {
-                expiresIn: '15m',
-            },
-            );
+    const newRefreshToken = this.jwtService.sign(
+        { sub: payload.sub },
+        { expiresIn: '7d' },
+    );
 
-        return {
-            access_token: accessToken,
-        };
+    await this.refreshTokenService.create(
+        payload.sub,
+        newRefreshToken,
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    );
+
+    return { access_token: newAccessToken, refresh_token: newRefreshToken };
     }
 }
